@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Abdo AI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            direction: rtl;
+        }
+
+        header {
+            background-color: #6200ea;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+
+        header nav {
+            margin-top: 10px;
+        }
+
+        header button {
+            background-color: #ffffff;
+            color: #6200ea;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .post-form {
+            margin: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 60px;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+
+        button {
+            background-color: #6200ea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+
+        #feed, #userPosts {
+            margin: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #profilePage {
+            padding: 20px;
+        }
+
+        .profile-info img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .profile-info input {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .post {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .post-header img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .comments {
+            margin-top: 10px;
+        }
+
+        .comment {
+            padding: 5px;
+            border-top: 1px solid #ddd;
+        }
+
+        .comment-header {
+            display: flex;
+            align-items: center;
+        }
+
+        .comment-header img {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .add-comment {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .add-comment textarea {
+            width: 100%;
+            height: 60px;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Chat Abdo AI</h1>
+        <nav>
+            <button id="profileButton">البروفيل</button>
+        </nav>
+    </header>
+    <main>
+        <!-- صفحة النشر -->
+        <section class="post-form">
+            <textarea id="postContent" placeholder="أضف نصًا..."></textarea>
+            <input type="file" id="postMedia" accept="image/*, video/*">
+            <button id="postButton">مشاركة</button>
+        </section>
+
+        <!-- التغذية (المنشورات) -->
+        <div id="feed"></div>
+    </main>
+
+    <!-- نافذة البروفيل -->
+    <div id="profilePage" class="hidden">
+        <h2>البروفيل الخاص بك</h2>
+        <div class="profile-info">
+            <input type="file" id="profilePic" accept="image/*">
+            <img id="profilePicPreview" src="default-profile.png" alt="الصورة الشخصية">
+            <input type="text" id="username" placeholder="أدخل اسم المستخدم">
+            <button id="saveProfile">حفظ التغييرات</button>
+        </div>
+        <button id="backToHome">العودة إلى الصفحة الرئيسية</button>
+    </div>
+
+    <!-- صفحة التعليقات -->
+    <div id="commentsPage" class="hidden">
+        <h2>التعليقات</h2>
+        <div id="commentList"></div>
+
+        <!-- حقل كتابة تعليق جديد -->
+        <div class="add-comment">
+            <textarea id="newComment" placeholder="اكتب تعليقك..."></textarea>
+            <button id="addCommentButton">إرسال</button>
+        </div>
+
+        <button id="backToFeed">العودة إلى الصفحة الرئيسية</button>
+    </div>
+
+    <script>
+        const postButton = document.getElementById("postButton");
+        const postContent = document.getElementById("postContent");
+        const postMedia = document.getElementById("postMedia");
+        const feed = document.getElementById("feed");
+
+        const profileButton = document.getElementById("profileButton");
+        const profilePage = document.getElementById("profilePage");
+        const profilePic = document.getElementById("profilePic");
+        const profilePicPreview = document.getElementById("profilePicPreview");
+        const usernameInput = document.getElementById("username");
+        const saveProfile = document.getElementById("saveProfile");
+        const backToHome = document.getElementById("backToHome");
+
+        const commentsPage = document.getElementById("commentsPage");
+        const backToFeed = document.getElementById("backToFeed");
+        const commentList = document.getElementById("commentList");
+        const newComment = document.getElementById("newComment");
+        const addCommentButton = document.getElementById("addCommentButton");
+
+        function saveData(key, value) {
+            localStorage.setItem(key, JSON.stringify(value));
+        }
+
+        function loadData(key) {
+            return JSON.parse(localStorage.getItem(key)) || null;
+        }
+
+        function loadProfile() {
+            const profile = loadData("profile") || { username: "", profilePic: "default-profile.png" };
+            usernameInput.value = profile.username;
+            profilePicPreview.src = profile.profilePic;
+        }
+
+        function saveProfileData() {
+            const profile = loadData("profile") || { posts: [] };
+            const newUsername = usernameInput.value.trim();
+            const usedNames = loadData("usedNames") || [];
+
+            if (!newUsername) {
+                return alert("يرجى إدخال اسم المستخدم!");
+            }
+            if (usedNames.includes(newUsername) && newUsername !== profile.username) {
+                return alert("اسم المستخدم مأخوذ بالفعل!");
+            }
+
+            profile.username = newUsername;
+            profile.profilePic = profilePicPreview.src;
+            if (!usedNames.includes(newUsername)) {
+                usedNames.push(newUsername);
+            }
+
+            saveData("profile", profile);
+            saveData("usedNames", usedNames);
+            alert("تم حفظ البروفيل بنجاح!");
+        }
+
+        profilePic.addEventListener("change", () => {
+            const file = profilePic.files[0];
+            const reader = new FileReader();
+            reader.onload = () => {
+                profilePicPreview.src = reader.result;
+            };
+            if (file) {
+                reader.readAsDataURL(file);
+            }
+        });
+
+        postButton.addEventListener("click", () => {
+            const content = postContent.value.trim();
+            const file = postMedia.files[0];
+            const profile = loadData("profile");
+
+            if (!profile || !profile.username) {
+                return alert("يرجى إعداد البروفيل أولاً!");
+            }
+            if (!content && !file) {
+                return alert("يرجى إضافة نص أو ملف!");
+            }
+
+            const post = {
+                content,
+                media: "",
+                mediaType: "",
+                date: new Date().toISOString(),
+                likes: 0,
+                comments: [],
+                username: profile.username,
+                profilePic: profile.profilePic
+            };
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    // تحديد نوع الملف (صورة أو فيديو)
+                    if (file.type.startsWith('image/')) {
+                        post.mediaType = 'image';
+                    } else if (file.type.startsWith('video/')) {
+                        post.mediaType = 'video';
+                    }
+                    post.media = reader.result;
+                    addPostToFeed(post);
+                    savePost(post);
+                };
+                reader.readAsDataURL(file);
+            } else {
+                addPostToFeed(post);
+                savePost(post);
+            }
+            postContent.value = "";
+            postMedia.value = "";
+        });
+
+        function addPostToFeed(post) {
+            const div = document.createElement("div");
+            div.className = "post";
+            div.innerHTML = `
+                <div class="post-header">
+                    <img src="${post.profilePic}" alt="الصورة الشخصية">
+                    <strong>${post.username}</strong>
+                </div>
+                <p>${post.content}</p>
+                ${post.mediaType === 'image' ? `<img src="${post.media}" alt="المرفق" style="max-width: 100%;">` : ""}
+                ${post.mediaType === 'video' ? `<video controls style="max-width: 100%;">
+                                                    <source src="${post.media}" type="video/mp4">
+                                                    Your browser does not support the video tag.
+                                                </video>` : ""}
+                <button class="likeButton">إعجاب (${post.likes})</button>
+                <button class="commentButton">التعليقات</button>
+            `;
+            feed.prepend(div);
+
+            const likeButton = div.querySelector(".likeButton");
+            likeButton.addEventListener("click", () => {
+                post.likes++;
+                likeButton.textContent = `إعجاب (${post.likes})`;
+                savePost(post);
+            });
+
+            const commentButton = div.querySelector(".commentButton");
+            commentButton.addEventListener("click", () => {
+                showCommentsPage(post);
+            });
+        }
+
+        function savePost(post) {
+            const posts = loadData("posts") || [];
+            const index = posts.findIndex(p => p.date === post.date);
+            if (index !== -1) {
+                posts[index] = post;
+            } else {
+                posts.push(post);
+            }
+            saveData("posts", posts);
+        }
+
+        function loadPosts() {
+            const posts = loadData("posts") || [];
+            posts.forEach(addPostToFeed);
+        }
+
+        profileButton.addEventListener("click", () => {
+            profilePage.classList.remove("hidden");
+            document.querySelector("main").classList.add("hidden");
+            loadProfile();
+        });
+
+        backToHome.addEventListener("click", () => {
+            profilePage.classList.add("hidden");
+            document.querySelector("main").classList.remove("hidden");
+        });
+
+        saveProfile.addEventListener("click", saveProfileData);
+
+        loadPosts();
+
+        // عرض صفحة التعليقات
+        function showCommentsPage(post) {
+            commentsPage.classList.remove("hidden");
+            document.querySelector("main").classList.add("hidden");
+
+            // تحميل التعليقات
+            renderComments(post);
+
+            // إضافة تعليق جديد
+            addCommentButton.onclick = () => {
+                const newCommentText = newComment.value.trim();
+                if (newCommentText) {
+                    post.comments.push(newCommentText);
+                    savePost(post);
+                    renderComments(post);  // إعادة عرض التعليقات بعد إضافة تعليق جديد
+                    newComment.value = "";  // مسح حقل النص بعد الإرسال
+                }
+            };
+        }
+
+        backToFeed.addEventListener("click", () => {
+            commentsPage.classList.add("hidden");
+            document.querySelector("main").classList.remove("hidden");
+        });
+
+        function renderComments(post) {
+            commentList.innerHTML = "";
+            post.comments.forEach(comment => {
+                const commentDiv = document.createElement("div");
+                commentDiv.className = "comment";
+                commentDiv.innerHTML = `
+                    <div class="comment-header">
+                        <img src="${post.profilePic}" alt="الصورة الشخصية">
+                        <strong>${post.username}</strong>
+                    </div>
+                    <p>${comment}</p>
+                `;
+                commentList.appendChild(commentDiv);
+            });
+        }
+    </script>
+</body>
+</html>
